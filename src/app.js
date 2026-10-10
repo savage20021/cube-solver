@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Cube, AXIS, FACES, COLOUR_HEX, parseAlg, formatMove, invertAlg, randomScramble } from './cube.js';
-import { solve } from './solver.js';
 
 // ------------------------------------------------------------------ scene
 
@@ -239,26 +238,31 @@ $('apply').onclick = () => {
 $('alg').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('apply').click(); });
 for (const b of document.querySelectorAll('.faces button')) b.onclick = () => userMove(b.dataset.move);
 
+// Solving happens in a worker so the cube keeps animating while it thinks.
+const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+let tablesReady = false;
+worker.postMessage({ type: 'init' });
+worker.onmessage = (e) => {
+  const msg = e.data;
+  if (msg.type === 'ready') { tablesReady = true; if (!solution && !summary.textContent) summary.textContent = ''; return; }
+  $('solve').disabled = false;
+  if (msg.type === 'error') { summary.textContent = 'Solver error: ' + msg.message; return; }
+  solution = { steps: msg.steps, k: 0, flat: [], ms: msg.ms };
+  msg.steps.forEach((st, si) => st.moves.forEach((move) => solution.flat.push({ move, step: si })));
+  renderSteps();
+  playback.hidden = false;
+  playing = true;
+  stepForward();
+};
+worker.onerror = (e) => { summary.textContent = 'Solver failed to load: ' + e.message; $('solve').disabled = false; };
+
 $('solve').onclick = () => {
   if (busy()) return;
   if (cube.isSolved()) { summary.textContent = 'Already solved. Scramble it first.'; return; }
+  clearSolution();
   $('solve').disabled = true;
-  summary.textContent = 'Thinking…';
-  setTimeout(() => {
-    try {
-      const r = solve(cube);
-      solution = { steps: r.steps, k: 0, flat: [] };
-      r.steps.forEach((st, si) => st.moves.forEach((move) => solution.flat.push({ move, step: si })));
-      renderSteps();
-      playback.hidden = false;
-      playing = true;
-      stepForward();
-    } catch (e) {
-      summary.textContent = 'Solver error: ' + e.message;
-    } finally {
-      $('solve').disabled = false;
-    }
-  }, 30);
+  summary.textContent = tablesReady ? 'Thinking…' : 'Building lookup tables, then thinking…';
+  worker.postMessage({ type: 'solve', method: $('method').value, data: Array.from(cube.d) });
 };
 
 function renderSteps() {
@@ -286,7 +290,7 @@ function updateStepHighlight() {
   stepsBox.querySelectorAll('.step').forEach((el) => el.classList.toggle('active', Number(el.dataset.step) === active));
   const cur = stepsBox.querySelector('.mv.current');
   if (cur) cur.scrollIntoView({ block: 'nearest' });
-  summary.textContent = `${n} moves in ${solution.steps.length} steps · move ${Math.min(k, n)} of ${n}` +
+  summary.textContent = `${n} moves in ${solution.steps.length} steps, found in ${solution.ms} ms · move ${Math.min(k, n)} of ${n}` +
     (k >= n ? ' · solved!' : '');
   $('play').textContent = playing ? '⏸ Pause' : '▶ Play';
   $('next').disabled = k >= n;

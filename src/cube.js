@@ -134,6 +134,27 @@ export class Cube {
 
   pos(i) { const o = i * STRIDE; return [this.d[o], this.d[o + 1], this.d[o + 2]]; }
 
+  /** Index of the cubie currently sitting at position (x, y, z). */
+  cubieAt(x, y, z) {
+    const d = this.d;
+    for (let i = 0; i < N_CUBIES; i++) {
+      const o = i * STRIDE;
+      if (d[o] === x && d[o + 1] === y && d[o + 2] === z) return i;
+    }
+    throw new Error(`no cubie at ${x},${y},${z}`);
+  }
+
+  /** Sticker colours of cubie i. */
+  colours(i) {
+    const out = [];
+    for (let s = 0; s < 3; s++) {
+      const c = this.d[i * STRIDE + 3 + s * 4 + 3];
+      if (c < 0) break;
+      out.push(c);
+    }
+    return out;
+  }
+
   /** Outward normal of the sticker with the given colour on cubie i, or null. */
   normalOf(i, colour) {
     const o = i * STRIDE;

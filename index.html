@@ -37,6 +37,7 @@
     border-radius: 8px; padding: 8px 10px; font: inherit; font-family: ui-monospace, Consolas, monospace; }
   label.inline { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
   input[type=range] { flex: 1; accent-color: var(--accent); }
+  select { flex: 1; background: #0f1115; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; font: inherit; }
   .faces { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
   .faces button { padding: 7px 0; font-family: ui-monospace, Consolas, monospace; }
   #steps { display: flex; flex-direction: column; gap: 10px; }
@@ -91,6 +92,12 @@
       <button data-move="D'">D'</button><button data-move="L'">L'</button><button data-move="B'">B'</button>
     </div>
 
+    <label class="inline">Method
+      <select id="method">
+        <option value="twophase">Two-phase, about 20 moves</option>
+        <option value="beginner">Layer by layer, about 110 moves</option>
+      </select>
+    </label>
     <label class="inline">Speed <input id="speed" type="range" min="1" max="10" value="6"></label>
 
     <div id="playback" class="row" hidden>
@@ -102,7 +109,7 @@
     <div id="summary"></div>
     <div id="steps"></div>
 
-    <p class="muted">Layer-by-layer method, each step found by a small search. Solutions run about 100 to 150 moves. A 20-move two-phase solver is the next upgrade.</p>
+    <p class="muted">Two-phase is Kociemba's algorithm: reduce the cube to a subgroup, then finish inside it, with pruning tables built in your browser on first load. Layer by layer is the beginner method with every step named.</p>
   </aside>
 </div>
 <script type="module" src="src/app.js"></script>
