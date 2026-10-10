@@ -144,6 +144,17 @@ export class Cube {
     throw new Error(`no cubie at ${x},${y},${z}`);
   }
 
+  /** Stickers of cubie i as [{normal, colour}]. */
+  cubieStickers(i) {
+    const out = [];
+    for (let s = 0; s < 3; s++) {
+      const so = i * STRIDE + 3 + s * 4;
+      if (this.d[so + 3] < 0) break;
+      out.push({ normal: [this.d[so], this.d[so + 1], this.d[so + 2]], colour: this.d[so + 3] });
+    }
+    return out;
+  }
+
   /** Sticker colours of cubie i. */
   colours(i) {
     const out = [];
@@ -179,6 +190,33 @@ export class Cube {
       }
     }
     return out;
+  }
+
+  /**
+   * Build a cube from a 54-character facelet string (see toFacelets for the layout).
+   * The result may describe an impossible cube; use validate() in twophase.js to check.
+   */
+  static fromFacelets(str) {
+    if (typeof str !== 'string' || str.length !== 54 || /[^URFDLB]/.test(str)) {
+      throw new Error('facelet string must be 54 characters from U R F D L B');
+    }
+    const cube = new Cube();
+    const d = cube.d;
+    for (let i = 0; i < N_CUBIES; i++) {
+      const o = i * STRIDE;
+      const p = [d[o], d[o + 1], d[o + 2]];
+      for (let s = 0; s < 3; s++) {
+        const so = o + 3 + s * 4;
+        if (d[so + 3] < 0) break;
+        const n = [d[so], d[so + 1], d[so + 2]];
+        const f = FACES.find((face) => AXIS[face][0] === n[0] && AXIS[face][1] === n[1] && AXIS[face][2] === n[2]);
+        const [right, down] = FACE_FRAME[f];
+        const c = p[0] * right[0] + p[1] * right[1] + p[2] * right[2];
+        const r = p[0] * down[0] + p[1] * down[1] + p[2] * down[2];
+        d[so + 3] = FACES.indexOf(str[FACES.indexOf(f) * 9 + (r + 1) * 3 + (c + 1)]);
+      }
+    }
+    return cube;
   }
 
   /** 54-character facelet string in URFDLB order (Kociemba layout), e.g. "UUUUUUUUURRR...". */

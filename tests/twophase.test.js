@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Cube, randomScramble } from '../src/cube.js';
-import { CubieCube, init, solve } from '../src/twophase.js';
+import { CubieCube, init, solve, validate } from '../src/twophase.js';
 
 test('cubie representation composes the same way the geometric model does', () => {
   for (let i = 0; i < 30; i++) {
@@ -57,4 +57,19 @@ test('solved cube and superflip', () => {
   const c = new Cube().move(superflip);
   const r = solve(c, { timeLimit: 2000 });
   assert.ok(c.clone().move(r.moves.join(' ')).isSolved());
+});
+
+test('facelet round trip and the validator', () => {
+  for (let i = 0; i < 20; i++) {
+    const f = new Cube().move(randomScramble(20)).toFacelets();
+    assert.equal(Cube.fromFacelets(f).toFacelets(), f);
+    assert.ok(validate(Cube.fromFacelets(f)).ok);
+  }
+  const solved = new Cube().toFacelets().split('');
+  const mutate = (pairs) => { const t = solved.slice(); for (const [i, c] of pairs) t[i] = c; return validate(Cube.fromFacelets(t.join(''))); };
+  assert.match(mutate([[8, 'F'], [20, 'R'], [9, 'U']]).error, /twisted/);          // URF corner rotated
+  assert.match(mutate([[7, 'F'], [19, 'U']]).error, /flipped/);                     // UF edge flipped
+  assert.match(mutate([[7, 'L'], [19, 'U'], [3, 'F'], [37, 'U']]).error, /swapped/); // UF and UL swapped
+  assert.match(mutate([[7, 'U'], [19, 'U']]).error, /exactly 9/);
+  assert.throws(() => Cube.fromFacelets('UUU'));
 });

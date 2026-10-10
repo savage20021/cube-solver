@@ -137,6 +137,59 @@ function indexPerm(idx, n) {
   return p;
 }
 
+// ---------------------------------------------------------------- validation
+
+const FACE_WORD = { U: 'top', D: 'bottom', F: 'front', B: 'back', R: 'right', L: 'left' };
+const COLOUR_WORD = ['yellow', 'red', 'green', 'white', 'orange', 'blue'];
+function slotWords(p) {
+  const faces = [];
+  if (p[1] === 1) faces.push('U'); if (p[1] === -1) faces.push('D');
+  if (p[2] === 1) faces.push('F'); if (p[2] === -1) faces.push('B');
+  if (p[0] === 1) faces.push('R'); if (p[0] === -1) faces.push('L');
+  return faces.map((f) => FACE_WORD[f]).join('-');
+}
+function parity(perm) {
+  let inv = 0;
+  for (let i = 0; i < perm.length; i++) for (let j = i + 1; j < perm.length; j++) if (perm[i] > perm[j]) inv++;
+  return inv % 2;
+}
+
+/**
+ * Check whether a Cube (perhaps painted by hand) is a reachable state.
+ * Returns {ok: true} or {ok: false, error: "plain-English reason"}.
+ */
+export function validate(cube) {
+  const counts = new Array(6).fill(0);
+  for (const col of cube.toFacelets()) counts[FACES.indexOf(col)]++;
+  const wrong = counts.map((n, i) => (n !== 9 ? `${COLOUR_WORD[i]} ${n}` : null)).filter(Boolean);
+  if (wrong.length) return { ok: false, error: `Every colour needs exactly 9 stickers. Off: ${wrong.join(', ')}.` };
+
+  const seenC = new Set(), seenE = new Set();
+  for (const p of CORNER_SLOTS) {
+    const cols = cube.colours(cube.cubieAt(...p));
+    const id = CORNER_ID.get(key(cols));
+    if (id === undefined) {
+      return { ok: false, error: `The ${slotWords(p)} corner has colours ${cols.map((c) => COLOUR_WORD[c]).join(', ')}, which no real corner has.` };
+    }
+    if (seenC.has(id)) return { ok: false, error: `The ${cols.map((c) => COLOUR_WORD[c]).join('-')} corner appears twice.` };
+    seenC.add(id);
+  }
+  for (const p of EDGE_SLOTS) {
+    const cols = cube.colours(cube.cubieAt(...p));
+    const id = EDGE_ID.get(key(cols));
+    if (id === undefined) {
+      return { ok: false, error: `The ${slotWords(p)} edge has colours ${cols.map((c) => COLOUR_WORD[c]).join(', ')}, which no real edge has.` };
+    }
+    if (seenE.has(id)) return { ok: false, error: `The ${cols.map((c) => COLOUR_WORD[c]).join('-')} edge appears twice.` };
+    seenE.add(id);
+  }
+  const c = CubieCube.fromCube(cube);
+  if ([...c.co].reduce((a, b) => a + b, 0) % 3 !== 0) return { ok: false, error: 'A corner is twisted. Check the three stickers of each corner piece.' };
+  if ([...c.eo].reduce((a, b) => a + b, 0) % 2 !== 0) return { ok: false, error: 'An edge is flipped. Check the two stickers of each edge piece.' };
+  if (parity(c.cp) !== parity(c.ep)) return { ok: false, error: 'Two pieces are swapped, which no sequence of turns can produce. Check for two corners or two edges in each other’s places.' };
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------- moves
 
 // Move index m = 3 * face + (quarter turns - 1); faces in URFDLB order.

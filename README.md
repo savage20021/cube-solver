@@ -13,6 +13,9 @@ No build step, no dependencies beyond Three.js from a CDN. Open `index.html` thr
 - **Turn it yourself.** Click a sticker to turn that face clockwise, shift-click for anticlockwise, or use
   the keyboard (`U R F D L B`, hold shift for the inverse). Drag to orbit.
 - **Scramble** with a random 25-move sequence, or type any sequence in standard notation and apply it.
+- **Enter your own cube.** Open the net, pick a colour, click stickers to paint what your real cube looks
+  like, and put it on the 3D model. Impossible cubes are rejected with a reason: a corner twisted, an edge
+  flipped, two pieces swapped, a piece that doesn't exist, or the wrong number of stickers of a colour.
 - **Solve.** Pick a method, and the solver works out a solution in about a second, then plays it back.
   Step forward and back through the moves, pause, or jump to the start. Each step is labelled with what
   it is doing ("White cross: R edge in", "Corner FR: insert", "Phase 2: finish using only U, D and half turns").
@@ -70,6 +73,15 @@ the classic named algorithms as macros, so the search there only has to decide h
 them and which U turns go between. Solutions average about 110 moves, which is what a human beginner
 would produce, and every one is verified by replaying it on the model in the tests.
 
+### Colour entry and validation
+
+The net is 54 clickable squares in the usual cross layout. On load it is filled from the current cube, so
+you can also tweak the cube that's on screen. `Cube.fromFacelets` turns the painted colours into a
+geometric cube, and `validate` in `src/twophase.js` runs the standard checks before the state is
+accepted: nine stickers per colour, every corner and edge is a piece that exists exactly once, corner
+twists sum to a multiple of three, edge flips sum to an even number, and the corner and edge
+permutations have the same parity. Each failure comes back as a plain-English sentence.
+
 ### Rendering (`src/app.js`)
 
 Three.js. The logical cube is the single source of truth: a move is animated by rotating a pivot group,
@@ -86,7 +98,6 @@ Node's built-in test runner. There is also a quick benchmark: `node scripts/benc
 
 ## Roadmap
 
-- **Enter your own cube** by painting the colours on a net, then solve it.
 - Webcam colour scanning.
 - Optimal solver (20 moves or fewer, always), which needs much bigger tables.
 

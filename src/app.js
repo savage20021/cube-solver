@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { Cube, AXIS, FACES, COLOUR_HEX, parseAlg, formatMove, invertAlg, randomScramble } from './cube.js';
+import { Cube, AXIS, FACES, COLOUR_HEX, COLOUR_NAMES, parseAlg, formatMove, invertAlg, randomScramble } from './cube.js';
+import { validate } from './twophase.js';
 
 // ------------------------------------------------------------------ scene
 
@@ -79,18 +80,22 @@ function roundedSquare(size, r) {
   return new THREE.ShapeGeometry(shape, 6);
 }
 
-/** Put every mesh exactly where the logical model says it is. */
+/** Put every mesh exactly where the logical model says it is, colours included. */
 function syncFromModel() {
   for (let i = 0; i < cubies.length; i++) {
     const g = cubies[i];
     scene.attach(g);
     g.position.fromArray(cube.pos(i));
     g.quaternion.identity();
-    for (const m of g.userData.stickers) {
-      const n = new THREE.Vector3().fromArray(cube.normalOf(i, m.userData.colour));
+    const stickers = cube.cubieStickers(i);
+    g.userData.stickers.forEach((m, k) => {
+      const { normal, colour } = stickers[k];
+      m.material = stickerMats[colour];
+      m.userData.colour = colour;
+      const n = new THREE.Vector3().fromArray(normal);
       m.position.copy(n).multiplyScalar(0.487);
       m.quaternion.setFromUnitVectors(Z, n);
-    }
+    });
   }
 }
 
@@ -124,8 +129,7 @@ function finishCurrent() {
   syncFromModel();
   const done = current.onDone;
   current = null;
-  updateBadge();
-  if (done) done();
+    if (done) done();
 }
 
 const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
@@ -329,6 +333,76 @@ $('first').onclick = () => {
     syncFromModel();
     updateBadge();
   }
+};
+
+updateBadge();
+
+// ------------------------------------------------------------------ colour entry (the net)
+
+// Net layout: grid column/row of the top-left facelet of each face, faces in URFDLB order.
+const NET_ORIGIN = { U: [3, 0], R: [6, 3], F: [3, 3], D: [3, 6], L: [0, 3], B: [9, 3] };
+const painter = $('painter'), net = $('net'), palette = $('palette'), paintError = $('paint-error');
+let paintColour = 0;
+const facelets = [];                       // 54 colour indices, URFDLB order
+const faceletEls = [];
+
+for (let i = 0; i < 54; i++) {
+  const face = FACES[Math.floor(i / 9)];
+  const [c0, r0] = NET_ORIGIN[face];
+  const el = document.createElement('div');
+  el.className = 'facelet' + (i % 9 === 4 ? ' centre' : '');
+  el.style.gridColumn = c0 + (i % 3) + 1;
+  el.style.gridRow = r0 + Math.floor((i % 9) / 3) + 1;
+  el.title = i % 9 === 4 ? `${face} centre (fixed)` : '';
+  el.onclick = () => { if (i % 9 !== 4) { facelets[i] = paintColour; paintNet(); } };
+  net.appendChild(el);
+  faceletEls.push(el);
+}
+const swatches = COLOUR_HEX.map((hex, i) => {
+  const el = document.createElement('div');
+  el.className = 'swatch';
+  el.style.background = hex;
+  el.title = COLOUR_NAMES[i];
+  el.onclick = () => { paintColour = i; paintNet(); };
+  palette.appendChild(el);
+  return el;
+});
+
+function paintNet() {
+  const counts = new Array(6).fill(0);
+  facelets.forEach((c, i) => { faceletEls[i].style.background = COLOUR_HEX[c]; counts[c]++; });
+  swatches.forEach((el, i) => {
+    el.classList.toggle('selected', i === paintColour);
+    el.classList.toggle('over', counts[i] > 9);
+    el.textContent = `${counts[i]}/9`;
+  });
+}
+
+function loadNetFromCube() {
+  const str = cube.toFacelets();
+  for (let i = 0; i < 54; i++) facelets[i] = FACES.indexOf(str[i]);
+  paintError.textContent = '';
+  paintNet();
+}
+
+$('paint').onclick = () => {
+  if (busy()) return;
+  painter.hidden = !painter.hidden;
+  if (!painter.hidden) loadNetFromCube();
+};
+$('paint-cancel').onclick = () => { painter.hidden = true; };
+$('paint-from').onclick = loadNetFromCube;
+$('paint-load').onclick = () => {
+  if (busy()) return;
+  const painted = Cube.fromFacelets(facelets.map((c) => FACES[c]).join(''));
+  const v = validate(painted);
+  if (!v.ok) { paintError.textContent = v.error; return; }
+  clearSolution();
+  cube.d.set(painted.d);
+  syncFromModel();
+  updateBadge();
+  painter.hidden = true;
+  summary.textContent = cube.isSolved() ? 'That cube is already solved.' : 'Cube loaded. Press Solve.';
 };
 
 updateBadge();
